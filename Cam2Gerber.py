@@ -7,7 +7,7 @@
 # -c<path of the .cam file> -b<path of the .brd file> [-e<path of the eaglecon.exe file>]
 #
 # Sample parameters:
-# -c"C:\Users\MyPie\Documents\eagle\PulseOx\Seeed_Gerber_Generator_4-layer_1-2-15-16.cam" -b"C:\Users\MyPie\repos\tonkalib\designs\BandpassFilter\results\o1ul2wxq\schema.brd"
+# -c"C:\Users\MyPie\Seeed_Gerber_Generator_4-layer_1-2-15-16.cam" -b"C:\Users\MyPie\schema.brd"
 #
 # -------------------------------------------------------------------------
 # The MIT License (MIT)
@@ -34,7 +34,6 @@
 #
 #
 from subprocess import call
-from unicodedata import normalize
 import re
 import os
 import sys
@@ -95,7 +94,8 @@ was written for EAGLE version 6.5.0 and Python version 2.7.5.
 g_warningCount = 0
 g_errorCount = 0
 
-def warning( args ):
+
+def warning(args):
     """
      Print a warning message to stdout, and increment a global warning-message counter.
 
@@ -104,9 +104,10 @@ def warning( args ):
     global g_warningCount
     g_warningCount += 1
     sys.stdout.write("*** Warning: ")
-    print( args )
+    print(args)
 
-def error( args ):
+
+def error(args):
     """
      Print an error message to stdout, and increment a global error-message counter.
 
@@ -115,119 +116,118 @@ def error( args ):
     global g_errorCount
     g_errorCount += 1
     sys.stdout.write("*** Error: ")
-    print( args )
+    print(args)
+
 
 #----------------------------------------------
 
-
-# Global camfile object
 class CamFile:
-
-    def __init__(self, camFilePath ):
+    def __init__(self, cam_file_path):
         """ Initializes the CamFile class with the CAM file's path. """
-        if not os.path.exists( camFilePath ):
-            error( 'Unable to open the CAM file path "{0}"'.format( camFilePath ))
+        if not os.path.exists(cam_file_path):
+            error('Unable to open the CAM file path "{0}"'.format(cam_file_path))
         else:
-            handle = open(camFilePath, 'r')
-            self.allLines = handle.readlines()
+            handle = open(cam_file_path, 'r')
+            self.all_lines = handle.readlines()
             handle.close()
-            self.lineIndex = 0
-            self.maxLines = len(self.allLines)
+            self.line_index = 0
+            self.max_lines = len(self.all_lines)
+            self.current_line_string = ""
 
-    def getNextLine(self):
+    def get_next_line(self):
         """ Returns the next line from the CAM file, with trailing whitespace trimmed. """
         result = None
-        if self.lineIndex < self.maxLines:
-            result = self.allLines[self.lineIndex].rstrip()
-            self.lineIndex += 1
-        self.currentLineString = result
+        if self.line_index < self.max_lines:
+            result = self.all_lines[self.line_index].rstrip()
+            self.line_index += 1
+        self.current_line_string = result
         return result
 
-    def isLinePrefix(self,prefix):
+    def is_line_prefix(self, prefix):
         """ Check if the current line starts with a prefix string. """
         result = False
-        if( prefix == self.currentLineString[:len(prefix)]):
+        if self.current_line_string[:len(prefix)] == prefix:
             result = True
         return result
 
-    def getKeyEqValue(self, key):
+    def get_key_eq_value(self, key):
         """ Check if a line starts with <key>=<value>, and if so
          advances to the next CAM line and return the value string.
         """
         value = None
         pattern = key + "="
-        if self.isLinePrefix(pattern):
-            value = self.currentLineString[len(pattern):]
-            self.getNextLine()
+        if self.is_line_prefix(pattern):
+            value = self.current_line_string[len(pattern):]
+            self.get_next_line()
         return value
 
     def eof(self):
-        " Return True if all CAM file lines have been processed."
-        return self.lineIndex >= self.maxLines
+        """ Return True if all CAM file lines have been processed."""
+        return self.line_index >= self.max_lines
 
-    def skipBlankLine(self):
+    def skip_blank_line(self):
         """ Skip the current CAM file line if it is blank. """
         result = False
-        if not self.currentLineString:
-            self.getNextLine()
+        if not self.current_line_string:
+            self.get_next_line()
             result = True
         return result
 
-    def getKeyLangEqQuotedVal(self, key):
+    def get_key_lang_eq_quoted_val(self, key):
         """ If the current line matches <key>[<languageCode>]="<value>",
         then return a tuple with the languageCode and value, and
         advance to the next line
         """
         result = []
         pattern = key + r'\[(.+)\]="(.*)"'
-        match = re.match( pattern, self.currentLineString )
+        match = re.match(pattern, self.current_line_string)
         if match:
-            result.append( match.group(1) )
-            result.append( match.group(2) )
-            self.getNextLine()
+            result.append(match.group(1))
+            result.append(match.group(2))
+            self.get_next_line()
         return result
 
-    def getMultipleKeyLangEqQuotedVal(self, key):
+    def get_multiple_key_lang_eq_quoted_val(self, key):
         """ Match one or more lines matching <key>[<languageCode>]="<value>",
         and if found, advance past them and return a dictionary with
         languageCodes as keys mapping to the values.
         """
-        matchingDone = False
-        resultDict = {}
-        while not matchingDone:
-            parts = self.getKeyLangEqQuotedVal(key)
+        matching_done = False
+        result_dict = {}
+        while not matching_done:
+            parts = self.get_key_lang_eq_quoted_val(key)
             if parts:
-                resultDict[parts[0]] = parts[1]
+                result_dict[parts[0]] = parts[1]
             else:
-                matchingDone = True
-        return resultDict
+                matching_done = True
+        return result_dict
 
-    def getValInSqBrackets(self):
+    def get_val_in_sq_brackets(self):
         """ Check if the line starts with text in square brackets, and if so,
         advance to the next line and return the string found in the brackets.
         """
         result = None
         pattern = r'\[(.+)\]'
-        match = re.match( pattern, self.currentLineString )
+        match = re.match(pattern, self.current_line_string)
         if match:
             result = match.group(1)
-            self.getNextLine()
+            self.get_next_line()
         return result
 
-    def getKeyEqQuotedVal(self,key):
+    def get_key_eq_quoted_val(self, key):
         """ Check if a line starts with <key>="<value>", and if so
          advance to the next line and return the value.
         """
         result = None
         pattern = key + r'="(.*)"'
-        match = re.match( pattern, self.currentLineString )
+        match = re.match(pattern, self.current_line_string)
         if match:
             result = match.group(1)
-            self.getNextLine()
+            self.get_next_line()
         return result
 
     # generic parse of cam name/value pair
-    def getKeyValuePairs(self,key):
+    def get_key_value_pairs(self, key):
         """ Checks if there are one or more lines of:
          - <key>[<languageCode]="<value>",
          or a single line of:
@@ -240,173 +240,175 @@ class CamFile:
          languages to values.  In the second and third case,
          the value string is returned.
         """
-        result = self.getMultipleKeyLangEqQuotedVal(key)
+        result = self.get_multiple_key_lang_eq_quoted_val(key)
         if not result:
-            result = self.getKeyEqQuotedVal(key)
+            result = self.get_key_eq_quoted_val(key)
         if not result:
-            result = self.getKeyEqValue(key)
+            result = self.get_key_eq_value(key)
         return result
+
 
 #---------------------------------------
 
-def newParseCam( camFilePath ):
+def parse_cam_file(cam_file_path):
     """ Parses a CAM file using the CamFile class, returning a dictionary with
     a description of the CAM job and sections describing each output file to be generated.
     """
     done = False
-    cam = CamFile(camFilePath)
-    bigResult = {}
-    if not cam.maxLines:
+    cam = CamFile(cam_file_path)
+    big_result = {}
+    section_list = []
+    if not cam.max_lines:
         done = True
-        error( "Unable to open '{0}'.".format( camFilePath ))
+        error("Unable to open '{0}'.".format(cam_file_path))
     if not done:
-        cam.getNextLine()
-        val = cam.getValInSqBrackets()
+        cam.get_next_line()
+        val = cam.get_val_in_sq_brackets()
         if not ('CAM Processor Job' == val):
             done = True
-            error( "File '{0}' was not a CAM processor job.".format( camFilePath ))
+            error("File '{0}' was not a CAM processor job.".format(cam_file_path))
     if not done:
-        bigResult['Description'] = cam.getMultipleKeyLangEqQuotedVal('Description')
+        big_result['Description'] = cam.get_multiple_key_lang_eq_quoted_val('Description')
 
     if not done:
-        sectionList = []
-        maybeSection = True
-        while maybeSection:
-            sectionValue = cam.getKeyEqValue('Section')
-            if None != sectionValue:
-                sectionList.append(sectionValue)
+        maybe_section = True
+        while maybe_section:
+            section_value = cam.get_key_eq_value('Section')
+            if None != section_value:
+                section_list.append(section_value)
             else:
-                maybeSection = False
-        if len(sectionList) == 0:
+                maybe_section = False
+        if len(section_list) == 0:
             done = True
-            error( "No sections found in the CAM file.")
+            error("No sections found in the CAM file.")
     if not done:
-        bigResult['Sections'] = []
+        big_result['Sections'] = []
     # parse multiple sections
     while (not done) and (not cam.eof()):
-        sectionResults = {}
-        done = not cam.skipBlankLine()
+        section_results = {}
+        done = not cam.skip_blank_line()
         if not done:
-            thisSection = cam.getValInSqBrackets()
-            if not (thisSection and thisSection in sectionList):
+            this_section = cam.get_val_in_sq_brackets()
+            if not (this_section and this_section in section_list):
                 done = True
                 warning("Section not found.")
             else:
-                sectionResults['tag'] = thisSection
+                section_results['tag'] = this_section
         if not done:
-            sectionResults['name'] = cam.getKeyValuePairs('Name')
-            sectionResults['prompt'] = cam.getKeyValuePairs('Prompt')
-            sectionResults['device'] = cam.getKeyValuePairs('Device')
-            if not sectionResults['device']:
+            section_results['name'] = cam.get_key_value_pairs('Name')
+            section_results['prompt'] = cam.get_key_value_pairs('Prompt')
+            section_results['device'] = cam.get_key_value_pairs('Device')
+            if not section_results['device']:
                 done = True
                 error("Device specification not found.")
         if not done:
-            sectionResults['wheel'] = cam.getKeyValuePairs('Wheel')
-            sectionResults['rack'] = cam.getKeyValuePairs('Rack')
-            sectionResults['scale'] = cam.getKeyValuePairs('Scale')
-            sectionResults['output'] = cam.getKeyValuePairs('Output')
-            if not sectionResults['output']:
+            section_results['wheel'] = cam.get_key_value_pairs('Wheel')
+            section_results['rack'] = cam.get_key_value_pairs('Rack')
+            section_results['scale'] = cam.get_key_value_pairs('Scale')
+            section_results['output'] = cam.get_key_value_pairs('Output')
+            if not section_results['output']:
                 done = True
-                error( "Output file name not found.")
+                error("Output file name not found.")
         if not done:
-            sectionResults['flags'] = cam.getKeyValuePairs('Flags')
-            if not sectionResults['flags']:
+            section_results['flags'] = cam.get_key_value_pairs('Flags')
+            if not section_results['flags']:
                 done = True
                 error("Flags not found.")
         if not done:
-            sectionResults['emulate'] = cam.getKeyValuePairs('Emulate')
-            if not sectionResults['emulate']:
+            section_results['emulate'] = cam.get_key_value_pairs('Emulate')
+            if not section_results['emulate']:
                 done = True
                 error("Emulate not found.")
         if not done:
-            sectionResults['offset'] = cam.getKeyValuePairs('Offset')
-            if not sectionResults['offset']:
+            section_results['offset'] = cam.get_key_value_pairs('Offset')
+            if not section_results['offset']:
                 done = True
                 error("Offset not found.")
         if not done:
-            sectionResults['sheet'] = cam.getKeyValuePairs('Sheet')
-            sectionResults['tolerance'] = cam.getKeyValuePairs('Tolerance')
-            sectionResults['pen'] = cam.getKeyValuePairs('Pen')
-            sectionResults['page'] = cam.getKeyValuePairs('Page')
+            section_results['sheet'] = cam.get_key_value_pairs('Sheet')
+            section_results['tolerance'] = cam.get_key_value_pairs('Tolerance')
+            section_results['pen'] = cam.get_key_value_pairs('Pen')
+            section_results['page'] = cam.get_key_value_pairs('Page')
 
-            sectionResults['layers'] = cam.getKeyValuePairs('Layers')
-            if not sectionResults['layers']:
+            section_results['layers'] = cam.get_key_value_pairs('Layers')
+            if not section_results['layers']:
                 done = True
-                error( "Layers not found" )
+                error("Layers not found")
         if not done:
-            sectionResults['colors'] = cam.getKeyValuePairs('Colors')
+            section_results['colors'] = cam.get_key_value_pairs('Colors')
         if not done:
             # Add section info to results
-            bigResult['Sections'].append( sectionResults )
-    return bigResult
+            big_result['Sections'].append(section_results)
+    return big_result
+
 
 #----------------------------------------------
 
-def getOutputName( nameTemplate, boardPath ):
+def get_output_name(name_template, board_path):
     """ Returns a file name string without CAM-name placeholders, from a file name string that may contain them.
 
      nameTemplate is a string possibly containing placeholders, such as "%N.cmp".
      boardPath is the path to the Eagle ".brd" file.
     """
     result = None
-    if( nameTemplate and boardPath):
-        replacementDict = {}
-        replacementDict['%N'] = os.path.splitext(os.path.basename(boardPath))[0]
-        replacementDict['%E'] = os.path.splitext(os.path.basename(boardPath))[1][1:]
-        replacementDict['%P'] = os.path.dirname(boardPath)
-        replacementDict['%H'] = os.path.expanduser('~')
-        replacementDict['%%'] = '%'
+    if name_template and board_path:
+        replacement_dict = {'%N': os.path.splitext(os.path.basename(board_path))[0],
+                            '%E': os.path.splitext(os.path.basename(board_path))[1][1:],
+                            '%P': os.path.dirname(board_path), '%H': os.path.expanduser('~'), '%%': '%'}
 
         #do the replacements here in one pass
-        rep = dict((re.escape(k), v) for k, v in replacementDict.iteritems())
+        rep = dict((re.escape(k), v) for k, v in replacement_dict.iteritems())
         pattern = re.compile("|".join(rep.keys()))
-        result = pattern.sub(lambda m: rep[re.escape(m.group(0))], nameTemplate)
+        result = pattern.sub(lambda m: rep[re.escape(m.group(0))], name_template)
     return result
 
 #----------------------------------------------
 g_boardLayerNumberToNameMap = {}
 
-def getBoardLayerNumberToNameMap(boardPath):
+
+def get_board_layer_number_to_name_map(board_path):
     """ Returns a map of an Eagle board's layer numbers to layer names. """
     if g_boardLayerNumberToNameMap:
         # TODO: We might check that the board path hasn't changed before returning the previous map.
         return g_boardLayerNumberToNameMap
-    if not os.path.exists( boardPath ):
-        error( 'Unable to open the board file "{0}".'.format( boardPath ))
+    if not os.path.exists(board_path):
+        error('Unable to open the board file "{0}".'.format(board_path))
         return g_boardLayerNumberToNameMap
     # TODO: We should ideally parse the board file as XML instead of using regular expressions to find layers.
     pattern = r'<layer number="([0-9]+)" name="([^"]+)"'
-    handle = open(boardPath, 'r')
-    allLines = handle.readlines()
-    for line in allLines:
-        match = re.match( pattern, line )
+    handle = open(board_path, 'r')
+    all_lines = handle.readlines()
+    for line in all_lines:
+        match = re.match(pattern, line)
         if match:
-            g_boardLayerNumberToNameMap[ match.group(1) ] = match.group(2)
+            g_boardLayerNumberToNameMap[match.group(1)] = match.group(2)
     return g_boardLayerNumberToNameMap
-
 
 
 #----------------------------------------------
 
-def getValidLayers( layerString, boardPath, sectionName):
+def get_valid_layers(layer_string, board_path, section_name):
     """ Generate a string with a space-separated list of board layers that are
     both in the board and in the layerString input.
     """
-    validList = []
-    boardLayerNumberToNameMap = getBoardLayerNumberToNameMap( boardPath )
-    layerList = layerString.split()
-    for layer in layerList:
-        if (layer in boardLayerNumberToNameMap) or (layer in boardLayerNumberToNameMap.values()):
-            validList.append(layer)
+    valid_list = []
+    board_layer_number_to_name_map = get_board_layer_number_to_name_map(board_path)
+    layer_list = layer_string.split()
+    for layer in layer_list:
+        if (layer in board_layer_number_to_name_map) or (layer in board_layer_number_to_name_map.values()):
+            valid_list.append(layer)
         else:
-            warning("Eagle layer {0} in the CAM tab named '{1}' is not a layer listed in the board file.".format( layer, sectionName ))
-    validLayerString = " ".join( validList )
-    return " " + validLayerString
+            msg_string = "Eagle layer {0} in the CAM tab named '{1}' is not a layer listed in the board file."
+            warning(msg_string.format(layer, section_name))
+    valid_layer_string = " ".join(valid_list)
+    return " " + valid_layer_string
+
+
 #----------------------------------------------
 
 
 # Convert CAM-file flag parameter to CAM-processor options:
-def getFlagString( camSection ):
+def get_flag_string(cam_section):
     """ Convert a space-separated string of zeroes and ones from a CAM-file flag value to
     a sequence of CAM-processor parameters, for parameters different from defaults.
 
@@ -421,66 +423,68 @@ def getFlagString( camSection ):
 
     A trailing '+" means the option's default is on, and '-' means it's off.
     """
-    resultString = ''
-    defaultValue = ' 0 0 0 1 0 1 1'.split()
-    flagLetters = 'm r u c q O f'.split()
-    rawFlagList = camSection['flags'].split()
-    for index, value in enumerate( rawFlagList ):
-        if value != defaultValue[index]:
-            resultString += ' -' + flagLetters[index] + ('+' if '1' == value else '-')
-    return resultString
+    result_string = ''
+    default_value = ' 0 0 0 1 0 1 1'.split()
+    flag_letters = 'm r u c q O f'.split()
+    raw_flag_list = cam_section['flags'].split()
+    for index, value in enumerate(raw_flag_list):
+        if value != default_value[index]:
+            result_string += ' -' + flag_letters[index] + ('+' if '1' == value else '-')
+    return result_string
+
+
 #----------------------------------------------
-def getOffsets( camSection ):
+def get_offsets(cam_section):
     """  Convert a CAM string containing a number, a linear-units string, a space, another
     number, and another linear-units string, to a tuple of two floats representing inches. """
     units = {
-        'mil': (1/1000.0),
-        'cm': (1/25.4),
-        'mm': (1/25.4),
+        'mil': (1 / 1000.0),
+        'cm': (1 / 25.4),
+        'mm': (1 / 25.4),
         'inch': 1.0
     }
-    xResult = 0
-    yResult = 0
+    x_result = 0.0
+    y_result = 0.0
     pattern = r'^([-+]?(\d+(\.\d*)?|\.\d+)([eE][-+]?\d+)?)(\S+)\s([-+]?(\d+(\.\d*)?|\.\d+)([eE][-+]?\d+)?)(\S+)$'
-    match = re.match( pattern, camSection['offset'] )
+    match = re.match(pattern, cam_section['offset'])
     if match:
-        xResult = float(match.group(1)) * float( units.get( match.group(5), 0 ))
-        yResult = float(match.group(6)) * float( units.get( match.group(10), 0 ))
-    return (xResult, yResult)
+        x_result = float(match.group(1)) * float(units.get(match.group(5), 0))
+        y_result = float(match.group(6)) * float(units.get(match.group(10), 0))
+    return x_result, y_result
+
 
 #----------------------------------------------
 
-def getEagleCommandFromCamSection( camSection, boardPath, eaglePath ):
+def get_eagle_command_from_cam_section(cam_section, board_path, eagle_path):
     """Produce a Windows command to run Eagle to generate a CAM output file.
 
     camSection is a dictionary containing parameter info.
     boardpath is the path to the Eagle board file.
     eaglePath is the path to the eaglecon.exe file.
     """
-    outputName = getOutputName( camSection['output'], boardPath )
-    wheelName = getOutputName( camSection['wheel'], boardPath )
-    inName = camSection['name']
-    if isinstance( inName, dict ) and ('en' in inName):
-        sectionName = inName['en']
+    output_name = get_output_name(cam_section['output'], board_path)
+    wheel_name = get_output_name(cam_section['wheel'], board_path)
+    in_name = cam_section['name']
+    if isinstance(in_name, dict) and ('en' in in_name):
+        section_name = in_name['en']
     else:
-        sectionName = str(inName)
-    validLayers = getValidLayers( camSection['layers'], boardPath, sectionName)
-    flagString = getFlagString( camSection )
+        section_name = str(in_name)
+    valid_layers = get_valid_layers(cam_section['layers'], board_path, section_name)
+    flag_string = get_flag_string(cam_section)
 
-    xFlag = ''
-    yFlag = ''
-    xOffset, yOffset = getOffsets( camSection )
-    if xOffset:
-        xFlag = ' -x'+ str(xOffset)
-    if yOffset:
-        yFlag = ' -y' + str(yOffset)
+    x_flag = ''
+    y_flag = ''
+    x_offset, y_offset = get_offsets(cam_section)
+    if x_offset:
+        x_flag = ' -x' + str(x_offset)
+    if y_offset:
+        y_flag = ' -y' + str(y_offset)
 
-    commandString = ( '"' + eaglePath + '"' + flagString + ' -X -d"' + camSection['device'] + '" -o"' + outputName +
-                      (('" -W"' + wheelName) if wheelName else '') +
-    '"' + xFlag + yFlag +
-    ' "' + boardPath + '" ' + validLayers)
-    return commandString
-
+    command_string = ('"' + eagle_path + '"' + flag_string + ' -X -d"' + cam_section['device'] + '" -o"' + output_name +
+                      (('" -W"' + wheel_name) if wheel_name else '') +
+                      '"' + x_flag + y_flag +
+                      ' "' + board_path + '" ' + valid_layers)
+    return command_string
 
 
 #----------------------------------------------
@@ -489,52 +493,55 @@ def main():
     """ Main routine that parses the .cam file, generates Windows commands, and executes them,
     to produce extended Gerber files and/or Excellon drill files.
     """
+    parse_result = {}
     parser = OptionParser()
     parser.add_option("-c", "--cam", dest="camFile",
-                help="path of the (.cam) CAM job file", metavar="FILE")
+                      help="path of the (.cam) CAM job file", metavar="FILE")
     parser.add_option("-b", "--board", dest="boardFile", metavar="FILE",
-                default=r".\schema.brd",
-                help="path of the (.brd) board file")
+                      default=r".\schema.brd",
+                      help="path of the (.brd) board file")
     parser.add_option("-e", "--eagle", dest="eagleFile", metavar="FILE",
-                default=r"C:\Program Files (x86)\EAGLE-6.5.0\bin\eaglecon.exe",
-                help="path of the 'eaglecon.exe' file")
+                      default=r"C:\Program Files (x86)\EAGLE-6.5.0\bin\eaglecon.exe",
+                      help="path of the 'eaglecon.exe' file")
 
     (options, args) = parser.parse_args()
-    myCamPath = options.camFile
-    if not myCamPath:
-        error( 'The path of the CAM file must be specified with the -c parameter.')
-    myBoard = options.boardFile
-    if not os.path.exists(myBoard):
-        error( 'The board file path "{0}" does not exist.'.format(myBoard))
-    myEaglePath = options.eagleFile
-    if not os.path.exists(myEaglePath):
-        error( 'The file "{0}" does not exist.  Please specify the "eaglecon.exe" path using the -e parameter.'.format(myEaglePath))
+    my_cam_path = options.camFile
+    if not my_cam_path:
+        error('The path of the CAM file must be specified with the -c parameter.')
+    my_board = options.boardFile
+    if not os.path.exists(my_board):
+        error('The board file path "{0}" does not exist.'.format(my_board))
+    my_eagle_path = options.eagleFile
+    if not os.path.exists(my_eagle_path):
+        error('The file "{0}" does not exist.  Please specify the "eaglecon.exe" path using the -e parameter.'.format(
+            my_eagle_path))
 
-    if( not g_errorCount ):
-        parseResult = newParseCam(myCamPath)
+    if not g_errorCount:
+        parse_result = parse_cam_file(my_cam_path)
 
-    expectedDevices = ["EXCELLON", "GERBER_RS274X", "GERBER_RS274X_25" ]
+    expected_devices = ["EXCELLON", "GERBER_RS274X", "GERBER_RS274X_25"]
 
-    if 'Sections' in parseResult:
-        for camSection in parseResult['Sections']:
-            eagleCommand = getEagleCommandFromCamSection( camSection, myBoard, myEaglePath )
-            print( eagleCommand )
-            if not camSection['device'] in expectedDevices:
-                warning( 'Device "{0}" is not supported, and the generated command line may be missing parameters. Only "GERBER_RS274X", "GERBER_RS274X_25", and "EXCELLON" are supported.'.format( camSection['device'] ))
-            returnCode = call(eagleCommand, shell=True)
-            print "return code: " + str(returnCode)
-            if returnCode < 0:
-                warning("Eagle CAD return code = {0}.".format(returnCode) )
-            # call('DIR /A-D /OD /TW "' + os.path.dirname(myBoard) + '"', shell=True)
-        print( '*** CAM job completed with {0} warnings and {1} errors. ***'.format( g_warningCount, g_errorCount ))
+    if 'Sections' in parse_result:
+        for camSection in parse_result['Sections']:
+            eagle_command = get_eagle_command_from_cam_section(camSection, my_board, my_eagle_path)
+            print(eagle_command)
+            if not camSection['device'] in expected_devices:
+                warning(
+                    'Device "{0}" is not supported, and the generated command line may be missing parameters. '
+                    'Only "GERBER_RS274X", "GERBER_RS274X_25", and "EXCELLON" '
+                    'are supported.'.format(camSection['device']))
+            return_code = call(eagle_command, shell=True)
+            print "return code: " + str(return_code)
+            if return_code < 0:
+                warning("Eagle CAD return code = {0}.".format(return_code))
+                # call('DIR /A-D /OD /TW "' + os.path.dirname(myBoard) + '"', shell=True)
+        print('*** CAM job completed with {0} warnings and {1} errors. ***'.format(g_warningCount, g_errorCount))
     else:
-        print( '*** CAM job did not run. ***')
+        print('*** CAM job did not run. ***')
     if g_warningCount + g_errorCount == 0:
         return 0
     else:
         return -1
-
-
 
 
 # Run the main program ************************************
