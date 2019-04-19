@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 #
 # Script to parse an Eagle-CAD CAM file, to produce Windows command lines
 # that are executed to produce Gerber plots and/or an Excellon drill file.
@@ -37,6 +37,7 @@ from subprocess import call
 import re
 import os
 import sys
+import platform
 from optparse import OptionParser
 
 #----------------------------------------------
@@ -480,7 +481,11 @@ def get_eagle_command_from_cam_section(cam_section, board_path, eagle_path):
     if y_offset:
         y_flag = ' -y' + str(y_offset)
 
-    command_string = ('"' + eagle_path + '"' + flag_string + ' -X -d"' + cam_section['device'] + '" -o"' + output_name +
+    executor = ""
+    if (platform.system() != 'Windows'):
+        executor = "yes 2>/dev/null | wine "
+
+    command_string = (executor + '"' + eagle_path + '"' + flag_string + ' -X -d"' + cam_section['device'] + '" -o"' + output_name +
                       (('" -W"' + wheel_name) if wheel_name else '') +
                       '"' + x_flag + y_flag +
                       ' "' + board_path + '" ' + valid_layers)
@@ -512,14 +517,17 @@ def main():
     if not os.path.exists(my_board):
         error('The board file path "{0}" does not exist.'.format(my_board))
     my_eagle_path = options.eagleFile
-    if not os.path.exists(my_eagle_path):
-        error('The file "{0}" does not exist.  Please specify the "eaglecon.exe" path using the -e parameter.'.format(
-            my_eagle_path))
+
+    # on linux & OSX, let wine work out if the path is valid or not
+    if (platform.system() == 'Windows'):
+        if not os.path.exists(my_eagle_path):
+            error('The file "{0}" does not exist.  Please specify the "eaglecon.exe" path using the -e parameter.'.format(
+        my_eagle_path))
 
     if not g_errorCount:
         parse_result = parse_cam_file(my_cam_path)
 
-    expected_devices = ["EXCELLON", "GERBER_RS274X", "GERBER_RS274X_25"]
+    expected_devices = ["EXCELLON", "EXCELLON_24", "GERBER_RS274X", "GERBER_RS274X_24", "GERBER_RS274X_25"]
 
     if 'Sections' in parse_result:
         for camSection in parse_result['Sections']:
